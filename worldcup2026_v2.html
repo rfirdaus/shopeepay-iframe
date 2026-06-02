@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Piala Dunia 2026</title>
+<style>
+  :root{
+    --text:#1f2937;
+    --muted:#6b7280;
+    --card:#ffffff;
+    --border:#f1d9d2;
+    --pill-bg:#fbe9e4;
+    --pill-text:#3a2a25;
+    --orange:#f1641e;
+    --orange-hover:#e0570f;
+    --done-bg:#e5e7eb;
+    --done-text:#9ca3af;
+    --live:#e11d48;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:transparent;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text);
+    padding:14px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px;margin:0 auto;}
+  .match{
+    background:var(--card);
+    border:2px solid var(--border);
+    border-radius:18px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+  .meta{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    gap:10px;margin-bottom:18px;flex-wrap:wrap;
+  }
+  .datetime{font-size:20px;font-weight:700;color:var(--text);line-height:1.3;}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--pill-bg);color:var(--pill-text);
+    font-size:15px;font-weight:600;
+    padding:7px 14px;border-radius:22px;white-space:nowrap;
+  }
+  .pill svg{width:16px;height:16px;flex-shrink:0;}
+  .pill.live{background:#fde2e7;color:var(--live);animation:pulse 1.4s infinite;}
+  .pill.done{background:var(--done-bg);color:var(--done-text);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+  .teams{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;margin-bottom:20px;
+  }
+  .team{display:flex;flex-direction:column;align-items:center;gap:12px;flex:1;min-width:0;}
+  .flag-circle{
+    width:78px;height:78px;border-radius:50%;
+    overflow:hidden;background:#f3f4f6;
+    box-shadow:0 2px 8px rgba(0,0,0,.10);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .flag-circle img{width:100%;height:100%;object-fit:cover;}
+  .tname{
+    font-size:21px;font-weight:600;color:var(--text);text-align:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+  }
+  .vs{font-size:21px;font-weight:800;color:var(--text);padding:0 6px;flex-shrink:0;}
+  .cta{
+    display:block;width:100%;border:none;cursor:pointer;
+    background:var(--orange);color:#fff;
+    font-weight:700;font-size:21px;
+    padding:15px;border-radius:12px;
+    transition:background .15s;
+    font-family:inherit;
+  }
+  .cta:hover{background:var(--orange-hover);}
+  .cta.done{background:var(--done-bg);color:var(--done-text);cursor:default;}
+  @media (max-width:420px){
+    .datetime{font-size:17px;}
+    .pill{font-size:13px;}
+    .tname{font-size:18px;}
+    .vs{font-size:18px;}
+    .flag-circle{width:64px;height:64px;}
+    .cta{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="list"></div>
+</div>
+
+<script>
+/* ---- Match data ----
+   utc = kickoff in ISO UTC
+   c = flag code: ISO 3166-1 alpha-2 (lowercase), or gb-eng / gb-sct for subdivisions
+   n = display name (Indonesian) */
+const MATCHES = [
+  { utc:"2026-06-11T23:00:00Z", a:{n:"Meksiko",c:"mx"}, b:{n:"Afrika Selatan",c:"za"} },
+  { utc:"2026-06-12T23:00:00Z", a:{n:"AS",c:"us"}, b:{n:"Paraguay",c:"py"} },
+  { utc:"2026-06-12T20:00:00Z", a:{n:"Kanada",c:"ca"}, b:{n:"Bosnia",c:"ba"} },
+  { utc:"2026-06-19T01:00:00Z", a:{n:"Brasil",c:"br"}, b:{n:"Haiti",c:"ht"} },
+  { utc:"2026-06-19T22:00:00Z", a:{n:"Skotlandia",c:"gb-sct"}, b:{n:"Maroko",c:"ma"} },
+  { utc:"2026-06-20T20:00:00Z", a:{n:"Jerman",c:"de"}, b:{n:"Pantai Gading",c:"ci"} },
+  { utc:"2026-06-21T04:00:00Z", a:{n:"Tunisia",c:"tn"}, b:{n:"Jepang",c:"jp"} },
+  { utc:"2026-06-23T01:00:00Z", a:{n:"Prancis",c:"fr"}, b:{n:"Senegal",c:"sn"} },
+  { utc:"2026-06-17T21:00:00Z", a:{n:"Inggris",c:"gb-eng"}, b:{n:"Kroasia",c:"hr"} },
+  { utc:"2026-06-18T00:00:00Z", a:{n:"Ghana",c:"gh"}, b:{n:"Panama",c:"pa"} },
+  { utc:"2026-06-21T00:00:00Z", a:{n:"Ekuador",c:"ec"}, b:{n:"RD Kongo",c:"cd"} },
+  { utc:"2026-06-19T01:00:00Z", a:{n:"AS",c:"us"}, b:{n:"Australia",c:"au"} },
+];
+
+const VOTE_BASE = "#vote"; // ganti dengan URL vote asli, mis. "https://situsanda.com/vote?match="
+
+/* Flag helper — circular. Primary: lipis/flag-icons 1x1 SVG (square, ideal for circle crop).
+   Fallback: flagcdn.com PNG. */
+function flagImg(code){
+  const primary  = `https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.3.2/flags/1x1/${code}.svg`;
+  const fallback = `https://flagcdn.com/w160/${code}.png`;
+  return `<div class="flag-circle"><img src="${primary}" alt="" loading="lazy"
+            onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fallback}';}else{this.style.display='none';}"></div>`;
+}
+
+/* Clock SVG icon for the pill */
+const CLOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+
+/* Timezone: clamp to GMT+7 / +8 / +9 based on user location */
+const realOffsetMin = -new Date().getTimezoneOffset();
+const h = realOffsetMin/60;
+let targetOffsetHrs;
+if (h <= 7.5) targetOffsetHrs = 7;
+else if (h < 8.5) targetOffsetHrs = 8;
+else targetOffsetHrs = 9;
+if (h>=7 && h<=9) targetOffsetHrs = Math.round(h);
+
+const MON_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+function fmtLocal(utcStr){
+  const d = new Date(utcStr);
+  const s = new Date(d.getTime() + targetOffsetHrs*3600*1000);
+  let hh = s.getUTCHours();
+  const mm = String(s.getUTCMinutes()).padStart(2,"0");
+  const ampm = hh >= 12 ? "PM" : "AM";
+  hh = hh % 12; if (hh === 0) hh = 12;
+  return `${s.getUTCDate()} ${MON_ID[s.getUTCMonth()]}, ${hh}:${mm} ${ampm}`;
+}
+
+function startingIn(utcStr){
+  const diff = new Date(utcStr).getTime() - Date.now();
+  const MATCH_LEN = 110*60*1000;
+  if (diff <= -MATCH_LEN) return {status:"done", text:"Selesai"};
+  if (diff <= 0) return {status:"live", text:"Berlangsung"};
+  const s=Math.floor(diff/1000);
+  const d=Math.floor(s/86400);
+  const hr=Math.floor((s%86400)/3600);
+  const mn=Math.floor((s%3600)/60);
+  const se=s%60;
+  let t;
+  if (d>0) t=`Dimulai dalam ${d}h ${hr}j`;
+  else if (hr>0) t=`Dimulai dalam ${hr}j ${mn}min`;
+  else if (mn>0) t=`Dimulai dalam ${mn}min`;
+  else t=`Dimulai dalam ${se}dtk`;
+  return {status:"upcoming", text:t};
+}
+
+/* Build the DOM ONCE. The flags and buttons are created a single time and never
+   recreated — only the countdown pill text/class is updated on each tick. This
+   prevents iOS Safari from re-decoding the flag images every second (the flicker). */
+function build(){
+  const list = document.getElementById("list");
+  list.innerHTML = MATCHES.map((m,i)=>{
+    const st = startingIn(m.utc);
+    const pillClass = st.status==="live"?"pill live":st.status==="done"?"pill done":"pill";
+    const ctaDone = (st.status==="done");
+    return `
+    <div class="match" data-i="${i}">
+      <div class="meta">
+        <div class="datetime">${fmtLocal(m.utc)}</div>
+        <div class="${pillClass}" data-pill="${i}">${CLOCK}<span data-pilltext="${i}">${st.text}</span></div>
+      </div>
+      <div class="teams">
+        <div class="team">${flagImg(m.a.c)}<div class="tname">${m.a.n}</div></div>
+        <div class="vs">vs</div>
+        <div class="team">${flagImg(m.b.c)}<div class="tname">${m.b.n}</div></div>
+      </div>
+      <button class="cta${ctaDone?' done':''}" data-cta="${i}" ${ctaDone?'disabled':''}
+        onclick="vote(${i})">${ctaDone?'Pertandingan Selesai':'Vote Sekarang'}</button>
+    </div>`;
+  }).join("");
+
+  // cache references once
+  MATCHES.forEach((m,i)=>{
+    m._pill     = list.querySelector(`[data-pill="${i}"]`);
+    m._pilltext = list.querySelector(`[data-pilltext="${i}"]`);
+    m._cta      = list.querySelector(`[data-cta="${i}"]`);
+    m._status   = startingIn(m.utc).status;
+  });
+}
+
+/* Per-second update: text only, plus class/button swap when status actually changes. */
+function tick(){
+  MATCHES.forEach((m)=>{
+    const st = startingIn(m.utc);
+    if (m._pilltext.textContent !== st.text) m._pilltext.textContent = st.text;
+
+    if (st.status !== m._status){
+      m._status = st.status;
+      m._pill.className = st.status==="live"?"pill live":st.status==="done"?"pill done":"pill";
+      if (st.status==="done"){
+        m._cta.className = "cta done";
+        m._cta.disabled = true;
+        m._cta.textContent = "Pertandingan Selesai";
+      } else {
+        m._cta.className = "cta";
+        m._cta.disabled = false;
+        m._cta.textContent = "Vote Sekarang";
+      }
+    }
+  });
+}
+
+function vote(i){
+  const m = MATCHES[i];
+  const url = VOTE_BASE + "=" + encodeURIComponent(m.a.n + "_vs_" + m.b.n);
+  try { window.top.location.href = url; }
+  catch(e){ window.location.href = url; }
+}
+
+build();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
