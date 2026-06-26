@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Piala Dunia 2026</title>
+<style>
+  :root{
+    --shopee:#ee4d2d;
+    --shopee-dark:#d8431f;
+    --text:#ffffff;                    /* on-card text is now white */
+    --muted:rgba(255,255,255,.85);
+    --card:#ee4d2d;                    /* card = Shopee orange */
+    --border:rgba(255,255,255,.25);    /* subtle white border on orange */
+    --pill-bg:rgba(255,255,255,.18);   /* translucent white pill */
+    --pill-text:#ffffff;
+    --cta-bg:#ffffff;                  /* button = white */
+    --cta-text:#ee4d2d;                /* button text = Shopee orange */
+    --cta-hover:#f5f5f5;
+    --done-bg:rgba(255,255,255,.25);
+    --done-text:rgba(255,255,255,.6);
+    --live:#fff1a8;                    /* readable live color on orange */
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{
+    background:transparent;
+    touch-action:pan-x pan-y;          /* allow scroll, block pinch-zoom */
+    -ms-touch-action:pan-x pan-y;
+    -webkit-text-size-adjust:100%;     /* stop iOS auto text scaling */
+    text-size-adjust:100%;
+    -webkit-user-select:none;
+    user-select:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text);
+    padding:8px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:560px;margin:0 auto;}
+  .match{
+    background:var(--card);
+    border:2px solid var(--border);
+    border-radius:18px;
+    padding:20px;
+    margin-bottom:12px;
+  }
+  .match:last-child{margin-bottom:0;}
+  .meta{
+    display:flex;justify-content:space-between;align-items:center;
+    gap:10px;margin-bottom:18px;flex-wrap:wrap;
+  }
+  .datetime{font-size:18px;font-weight:700;color:var(--text);line-height:1.3;}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--pill-bg);color:var(--pill-text);
+    font-size:13px;font-weight:600;
+    padding:6px 12px;border-radius:20px;white-space:nowrap;
+  }
+  .pill svg{width:14px;height:14px;flex-shrink:0;}
+  .pill.live{background:rgba(255,255,255,.25);color:var(--live);animation:pulse 1.4s infinite;}
+  .pill.done{background:var(--done-bg);color:var(--done-text);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.55;}}
+  .teams{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;margin-bottom:20px;
+  }
+  .team{display:flex;flex-direction:column;align-items:center;gap:12px;flex:1;min-width:0;}
+  .flag-circle{
+    width:78px;height:78px;border-radius:50%;
+    overflow:hidden;background:#fff;
+    border:3px solid #fff;
+    box-shadow:0 2px 10px rgba(0,0,0,.18);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .flag-circle img{width:100%;height:100%;object-fit:cover;}
+  .tname{
+    font-size:21px;font-weight:600;color:var(--text);text-align:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;
+  }
+  .vs{font-size:21px;font-weight:800;color:var(--text);padding:0 6px;flex-shrink:0;}
+  .cta{
+    display:block;width:100%;border:none;cursor:pointer;
+    background:var(--cta-bg);color:var(--cta-text);
+    font-weight:700;font-size:21px;
+    padding:15px;border-radius:12px;
+    transition:background .15s;
+    font-family:inherit;
+  }
+  .cta:hover{background:var(--cta-hover);}
+  .cta.done{background:var(--done-bg);color:var(--done-text);cursor:default;}
+  @media (max-width:420px){
+    .datetime{font-size:15px;}
+    .pill{font-size:12px;}
+    .tname{font-size:18px;}
+    .vs{font-size:18px;}
+    .flag-circle{width:64px;height:64px;}
+    .cta{font-size:18px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="list"></div>
+</div>
+
+<script>
+/* ---- Disable zoom (belt-and-suspenders for iOS Safari, which ignores
+   user-scalable=no). Blocks pinch-zoom gestures and double-tap zoom,
+   while leaving normal scrolling and button taps intact. */
+(function(){
+  // pinch-zoom (Safari gesture events)
+  ["gesturestart","gesturechange","gestureend"].forEach(function(ev){
+    document.addEventListener(ev, function(e){ e.preventDefault(); }, {passive:false});
+  });
+  // multi-touch pinch via touchmove
+  document.addEventListener("touchmove", function(e){
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }, {passive:false});
+  // double-tap zoom
+  let lastTouch = 0;
+  document.addEventListener("touchend", function(e){
+    const now = Date.now();
+    if (now - lastTouch <= 300) e.preventDefault();
+    lastTouch = now;
+  }, {passive:false});
+  // ctrl/cmd + wheel zoom (desktop, harmless to block)
+  document.addEventListener("wheel", function(e){
+    if (e.ctrlKey) e.preventDefault();
+  }, {passive:false});
+})();
+
+/* ---- Match data ----
+   utc = kickoff in ISO UTC
+   c = flag code: ISO 3166-1 alpha-2 (lowercase), or gb-eng / gb-sct for subdivisions
+   n = display name (Indonesian)
+   id = stable identifier used to select a single match via ?match=ID */
+const MATCHES = [
+  { id:"por-cod", utc:"2026-06-17T17:00:00Z", a:{n:"Portugal",c:"pt"}, b:{n:"RD Kongo",c:"cd"} },
+  { id:"eng-cro", utc:"2026-06-17T20:00:00Z", a:{n:"Inggris",c:"gb-eng"}, b:{n:"Kroasia",c:"hr"} },
+  { id:"gha-pan", utc:"2026-06-17T23:00:00Z", a:{n:"Ghana",c:"gh"}, b:{n:"Panama",c:"pa"} },
+  { id:"uzb-col", utc:"2026-06-18T02:00:00Z", a:{n:"Uzbekistan",c:"uz"}, b:{n:"Kolombia",c:"co"} },
+  { id:"cze-rsa", utc:"2026-06-18T16:00:00Z", a:{n:"Republik Ceko",c:"cz"}, b:{n:"Afrika Selatan",c:"za"} },
+  { id:"sui-bih", utc:"2026-06-18T19:00:00Z", a:{n:"Swiss",c:"ch"}, b:{n:"Bosnia & Herzegovina",c:"ba"} },
+  { id:"can-qat", utc:"2026-06-18T22:00:00Z", a:{n:"Kanada",c:"ca"}, b:{n:"Qatar",c:"qa"} },
+  { id:"mex-kor", utc:"2026-06-19T01:00:00Z", a:{n:"Meksiko",c:"mx"}, b:{n:"Korea Selatan",c:"kr"} },
+  { id:"usa-aus", utc:"2026-06-19T19:00:00Z", a:{n:"Amerika Serikat",c:"us"}, b:{n:"Australia",c:"au"} },
+  { id:"sco-mar", utc:"2026-06-19T22:00:00Z", a:{n:"Skotlandia",c:"gb-sct"}, b:{n:"Maroko",c:"ma"} },
+  { id:"bra-hai", utc:"2026-06-20T00:30:00Z", a:{n:"Brasil",c:"br"}, b:{n:"Haiti",c:"ht"} },
+  { id:"tur-par", utc:"2026-06-20T03:00:00Z", a:{n:"Turki",c:"tr"}, b:{n:"Paraguay",c:"py"} },
+  { id:"ned-swe", utc:"2026-06-20T17:00:00Z", a:{n:"Belanda",c:"nl"}, b:{n:"Swedia",c:"se"} },
+  { id:"ger-civ", utc:"2026-06-20T20:00:00Z", a:{n:"Jerman",c:"de"}, b:{n:"Pantai Gading",c:"ci"} },
+  { id:"ecu-cuw", utc:"2026-06-21T00:00:00Z", a:{n:"Ekuador",c:"ec"}, b:{n:"Curacao",c:"cw"} },
+  { id:"tun-jpn", utc:"2026-06-21T04:00:00Z", a:{n:"Tunisia",c:"tn"}, b:{n:"Jepang",c:"jp"} },
+  { id:"esp-ksa", utc:"2026-06-21T16:00:00Z", a:{n:"Spanyol",c:"es"}, b:{n:"Arab Saudi",c:"sa"} },
+  { id:"bel-irn", utc:"2026-06-21T19:00:00Z", a:{n:"Belgia",c:"be"}, b:{n:"Iran",c:"ir"} },
+  { id:"uru-cpv", utc:"2026-06-21T22:00:00Z", a:{n:"Uruguay",c:"uy"}, b:{n:"Tanjung Verde",c:"cv"} },
+  { id:"nzl-egy", utc:"2026-06-22T01:00:00Z", a:{n:"Selandia Baru",c:"nz"}, b:{n:"Mesir",c:"eg"} },
+  { id:"arg-aut", utc:"2026-06-22T17:00:00Z", a:{n:"Argentina",c:"ar"}, b:{n:"Austria",c:"at"} },
+  { id:"fra-irq", utc:"2026-06-22T21:00:00Z", a:{n:"Prancis",c:"fr"}, b:{n:"Irak",c:"iq"} },
+  { id:"nor-sen", utc:"2026-06-23T00:00:00Z", a:{n:"Norwegia",c:"no"}, b:{n:"Senegal",c:"sn"} },
+  { id:"jor-alg", utc:"2026-06-23T03:00:00Z", a:{n:"Yordania",c:"jo"}, b:{n:"Aljazair",c:"dz"} },
+  { id:"por-uzb", utc:"2026-06-23T17:00:00Z", a:{n:"Portugal",c:"pt"}, b:{n:"Uzbekistan",c:"uz"} },
+  { id:"eng-gha", utc:"2026-06-23T20:00:00Z", a:{n:"Inggris",c:"gb-eng"}, b:{n:"Ghana",c:"gh"} },
+  { id:"pan-cro", utc:"2026-06-23T23:00:00Z", a:{n:"Panama",c:"pa"}, b:{n:"Kroasia",c:"hr"} },
+  { id:"col-cod", utc:"2026-06-24T02:00:00Z", a:{n:"Kolombia",c:"co"}, b:{n:"RD Kongo",c:"cd"} },
+  { id:"sui-can", utc:"2026-06-24T19:00:00Z", a:{n:"Swiss",c:"ch"}, b:{n:"Kanada",c:"ca"} },
+  { id:"bih-qat", utc:"2026-06-24T19:00:00Z", a:{n:"Bosnia & Herzegovina",c:"ba"}, b:{n:"Qatar",c:"qa"} },
+  { id:"mar-hai", utc:"2026-06-24T22:00:00Z", a:{n:"Maroko",c:"ma"}, b:{n:"Haiti",c:"ht"} },
+  { id:"sco-bra", utc:"2026-06-24T22:00:00Z", a:{n:"Skotlandia",c:"gb-sct"}, b:{n:"Brasil",c:"br"} },
+  { id:"rsa-kor", utc:"2026-06-25T01:00:00Z", a:{n:"Afrika Selatan",c:"za"}, b:{n:"Korea Selatan",c:"kr"} },
+  { id:"cze-mex", utc:"2026-06-25T01:00:00Z", a:{n:"Republik Ceko",c:"cz"}, b:{n:"Meksiko",c:"mx"} },
+  { id:"cuw-civ", utc:"2026-06-25T20:00:00Z", a:{n:"Curacao",c:"cw"}, b:{n:"Pantai Gading",c:"ci"} },
+  { id:"ecu-ger", utc:"2026-06-25T20:00:00Z", a:{n:"Ekuador",c:"ec"}, b:{n:"Jerman",c:"de"} },
+  { id:"tun-ned", utc:"2026-06-25T23:00:00Z", a:{n:"Tunisia",c:"tn"}, b:{n:"Belanda",c:"nl"} },
+  { id:"jpn-swe", utc:"2026-06-25T23:00:00Z", a:{n:"Jepang",c:"jp"}, b:{n:"Swedia",c:"se"} },
+  { id:"tur-usa", utc:"2026-06-26T02:00:00Z", a:{n:"Turki",c:"tr"}, b:{n:"Amerika Serikat",c:"us"} },
+  { id:"par-aus", utc:"2026-06-26T02:00:00Z", a:{n:"Paraguay",c:"py"}, b:{n:"Australia",c:"au"} },
+  { id:"nor-fra", utc:"2026-06-26T19:00:00Z", a:{n:"Norwegia",c:"no"}, b:{n:"Prancis",c:"fr"} },
+  { id:"sen-irq", utc:"2026-06-26T19:00:00Z", a:{n:"Senegal",c:"sn"}, b:{n:"Irak",c:"iq"} },
+  { id:"cpv-ksa", utc:"2026-06-27T00:00:00Z", a:{n:"Tanjung Verde",c:"cv"}, b:{n:"Arab Saudi",c:"sa"} },
+  { id:"uru-esp", utc:"2026-06-27T00:00:00Z", a:{n:"Uruguay",c:"uy"}, b:{n:"Spanyol",c:"es"} },
+  { id:"nzl-bel", utc:"2026-06-27T03:00:00Z", a:{n:"Selandia Baru",c:"nz"}, b:{n:"Belgia",c:"be"} },
+  { id:"egy-irn", utc:"2026-06-27T03:00:00Z", a:{n:"Mesir",c:"eg"}, b:{n:"Iran",c:"ir"} },
+  { id:"pan-eng", utc:"2026-06-27T21:00:00Z", a:{n:"Panama",c:"pa"}, b:{n:"Inggris",c:"gb-eng"} },
+  { id:"cro-gha", utc:"2026-06-27T21:00:00Z", a:{n:"Kroasia",c:"hr"}, b:{n:"Ghana",c:"gh"} },
+  { id:"col-por", utc:"2026-06-27T23:30:00Z", a:{n:"Kolombia",c:"co"}, b:{n:"Portugal",c:"pt"} },
+  { id:"cod-uzb", utc:"2026-06-27T23:30:00Z", a:{n:"RD Kongo",c:"cd"}, b:{n:"Uzbekistan",c:"uz"} },
+  { id:"alg-aut", utc:"2026-06-28T02:00:00Z", a:{n:"Aljazair",c:"dz"}, b:{n:"Austria",c:"at"} },
+  { id:"jor-arg", utc:"2026-06-28T02:00:00Z", a:{n:"Yordania",c:"jo"}, b:{n:"Argentina",c:"ar"} },
+];
+
+const VOTE_URL = "https://app.shopeepay.co.id/universal-link/wallet/promotion/tournament?page_tab=1";
+
+/* Flag helper — circular. Primary: lipis/flag-icons 1x1 SVG (square, ideal for circle crop).
+   Fallback: flagcdn.com PNG. */
+function flagImg(code){
+  const primary  = `https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.3.2/flags/1x1/${code}.svg`;
+  const fallback = `https://flagcdn.com/w160/${code}.png`;
+  return `<div class="flag-circle"><img src="${primary}" alt="" loading="lazy"
+            onerror="if(this.dataset.fb!=='1'){this.dataset.fb='1';this.src='${fallback}';}else{this.style.display='none';}"></div>`;
+}
+
+/* Clock SVG icon for the pill */
+const CLOCK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+
+/* Timezone: clamp to GMT+7 / +8 / +9 based on user location */
+const realOffsetMin = -new Date().getTimezoneOffset();
+const h = realOffsetMin/60;
+let targetOffsetHrs;
+if (h <= 7.5) targetOffsetHrs = 7;
+else if (h < 8.5) targetOffsetHrs = 8;
+else targetOffsetHrs = 9;
+if (h>=7 && h<=9) targetOffsetHrs = Math.round(h);
+
+const MON_ID = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+let CURRENT_MATCH_ID = null;
+let CURRENT_MATCH = null;
+
+function fmtLocal(utcStr){
+  const d = new Date(utcStr);
+  const s = new Date(d.getTime() + targetOffsetHrs*3600*1000);
+  let hh = s.getUTCHours();
+  const mm = String(s.getUTCMinutes()).padStart(2,"0");
+  const ampm = hh >= 12 ? "PM" : "AM";
+  hh = hh % 12; if (hh === 0) hh = 12;
+  return `${s.getUTCDate()} ${MON_ID[s.getUTCMonth()]}, ${hh}:${mm} ${ampm}`;
+}
+
+function startingIn(utcStr){
+  const diff = new Date(utcStr).getTime() - Date.now();
+
+  // In this one-match version, only future matches should be shown.
+  // Once kickoff time is reached, tick() rebuilds the card with the next future match.
+  if (diff <= 0) return {status:"started", text:"Dimulai"};
+
+  const s=Math.floor(diff/1000);
+  const d=Math.floor(s/86400);
+  const hr=Math.floor((s%86400)/3600);
+  const mn=Math.floor((s%3600)/60);
+  const se=s%60;
+  let t;
+  if (d>0) t=`Dimulai dalam ${d}h ${hr}j`;
+  else if (hr>0) t=`Dimulai dalam ${hr}j ${mn}min`;
+  else if (mn>0) t=`Dimulai dalam ${mn}min`;
+  else t=`Dimulai dalam ${se}dtk`;
+  return {status:"upcoming", text:t};
+}
+
+function getNextUpcomingMatch(){
+  const now = Date.now();
+  return MATCHES
+    .filter(m => new Date(m.utc).getTime() > now)
+    .sort((a,b) => new Date(a.utc).getTime() - new Date(b.utc).getTime())[0] || null;
+}
+
+function emptyState(){
+  return `
+    <div class="match">
+      <div class="meta">
+        <div class="datetime">Semua pertandingan selesai</div>
+        <div class="pill done">${CLOCK}<span>Selesai</span></div>
+      </div>
+      <button class="cta done" disabled>Pertandingan Selesai</button>
+    </div>`;
+}
+
+function matchCard(m){
+  const st = startingIn(m.utc);
+  return `
+    <div class="match" data-id="${m.id}">
+      <div class="meta">
+        <div class="datetime" data-datetime>${fmtLocal(m.utc)}</div>
+        <div class="pill" data-pill>${CLOCK}<span data-pilltext>${st.text}</span></div>
+      </div>
+      <div class="teams">
+        <div class="team">${flagImg(m.a.c)}<div class="tname">${m.a.n}</div></div>
+        <div class="vs">vs</div>
+        <div class="team">${flagImg(m.b.c)}<div class="tname">${m.b.n}</div></div>
+      </div>
+      <button class="cta" data-cta onclick="vote()">Vote Sekarang</button>
+    </div>`;
+}
+
+/* Build one card only: the closest match whose kickoff time is still in the future. */
+function build(){
+  const list = document.getElementById("list");
+  const next = getNextUpcomingMatch();
+  CURRENT_MATCH = next;
+  CURRENT_MATCH_ID = next ? next.id : null;
+
+  list.innerHTML = next ? matchCard(next) : emptyState();
+
+  if (next){
+    next._pill     = list.querySelector("[data-pill]");
+    next._pilltext = list.querySelector("[data-pilltext]");
+    next._cta      = list.querySelector("[data-cta]");
+  }
+  reportHeight();
+}
+
+/* Per-second update: refresh countdown text. When the shown match starts,
+   rebuild immediately so the widget jumps to the next upcoming match. */
+function tick(){
+  const next = getNextUpcomingMatch();
+
+  // Match started, schedule changed, or there are no upcoming matches anymore.
+  if (!next || next.id !== CURRENT_MATCH_ID){
+    build();
+    return;
+  }
+
+  const st = startingIn(next.utc);
+  if (st.status !== "upcoming"){
+    build();
+    return;
+  }
+
+  if (next._pilltext && next._pilltext.textContent !== st.text){
+    next._pilltext.textContent = st.text;
+  }
+}
+
+function vote(){
+  try { window.top.location.href = VOTE_URL; }
+  catch(e){ window.location.href = VOTE_URL; }
+}
+
+/* ---- Auto-height: tell the parent how tall this content is, so the iframe
+   never needs a hardcoded pixel height. Works two ways:
+   1) postMessage — parent can listen and set iframe.height (cross-origin safe)
+   2) direct resize if same-origin (best-effort) */
+function reportHeight(){
+  // full document height including margins
+  const body = document.body, html = document.documentElement;
+  const height = Math.max(
+    body.scrollHeight, body.offsetHeight,
+    html.clientHeight, html.scrollHeight, html.offsetHeight
+  );
+  // 1) notify parent
+  try {
+    window.parent.postMessage({ type:"wc2026:height", height: height }, "*");
+  } catch(e){}
+  // 2) best-effort direct (same-origin only; silently ignored cross-origin)
+  try {
+    if (window.frameElement) window.frameElement.style.height = height + "px";
+  } catch(e){}
+}
+
+build();
+setInterval(tick, 1000);
+
+// report height on load, after fonts/flags settle, and whenever the box resizes
+window.addEventListener("load", reportHeight);
+document.addEventListener("DOMContentLoaded", reportHeight);
+setTimeout(reportHeight, 300);
+setTimeout(reportHeight, 1200);
+if (window.ResizeObserver){
+  new ResizeObserver(reportHeight).observe(document.body);
+}
+</script>
+</body>
+</html>
